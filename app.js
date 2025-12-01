@@ -1,6 +1,5 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-// Your Supabase data (plugged in)
 const SUPABASE_URL = "https://pgcririgwmezvulabvuh.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnY3Jpcmlnd21lenZ1bGFidnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MDg4ODIsImV4cCI6MjA4MDE4NDg4Mn0.z0JTFGLTQBeUr4dzPl-310me-zLU3kGFZLofcKUWT6s";
 
@@ -20,7 +19,8 @@ const checkResult = document.getElementById("checkResult");
 const reportsBlock = document.getElementById("reportsBlock");
 const backFromCheck = document.getElementById("backFromCheck");
 
-const reportTarget = document.getElementById("reportTarget");
+const reportUid = document.getElementById("reportUid");
+const reportNick = document.getElementById("reportNick");
 const reportMessage = document.getElementById("reportMessage");
 const doReportBtn = document.getElementById("doReportBtn");
 const reportMsg = document.getElementById("reportMsg");
@@ -66,9 +66,48 @@ backFromReport.onclick = () => {
   hide(reportCard);
   show(actionsCard);
   setMsg(reportMsg, "");
-  reportTarget.value = "";
+  reportUid.value = "";
+  reportNick.value = "";
   reportMessage.value = "";
   autoGrow(reportMessage);
+};
+
+// REPORT USER
+doReportBtn.dataset.label = "Submit report";
+doReportBtn.onclick = async () => {
+  const uid = reportUid.value.trim() || null;
+  const nickname = reportNick.value.trim() || null;
+  const message = reportMessage.value.trim();
+
+  if (!uid && !nickname) {
+    setMsg(reportMsg, "Please enter at least UID or nickname.", false);
+    return;
+  }
+  if (!message) {
+    setMsg(reportMsg, "Report message is required.", false);
+    return;
+  }
+
+  setLoading(doReportBtn, true, "Submitting");
+  setMsg(reportMsg, "");
+
+  const { error } = await db.from("reports").insert([{
+    reported_uid: uid,
+    reported_nickname: nickname,
+    report_message: message
+  }]);
+
+  setLoading(doReportBtn, false);
+
+  if (error) {
+    setMsg(reportMsg, error.message, false);
+  } else {
+    setMsg(reportMsg, "Report saved. Thanks!", true);
+    reportUid.value = "";
+    reportNick.value = "";
+    reportMessage.value = "";
+    autoGrow(reportMessage);
+  }
 };
 
 // CHECK USER
@@ -86,63 +125,40 @@ doCheckBtn.onclick = async () => {
   reportsBlock.innerHTML = "";
   hide(reportsBlock);
 
-  // 1) find user by UID
-  let { data: users, error } = await db
-    .from("users")
-    .select("uid, nickname")
-    .eq("uid", q)
-    .limit(1);
-
-  // 2) if not found, try nickname
-  if (!error && (!users || users.length === 0)) {
-    ({ data: users, error } = await db
-      .from("users")
-      .select("uid, nickname")
-      .ilike("nickname", q)
-      .limit(1));
-  }
-
-  if (error) {
-    setLoading(doCheckBtn, false);
-    setMsg(checkResult, error.message, false);
-    return;
-  }
-
-  if (!users || users.length === 0) {
-    setLoading(doCheckBtn, false);
-    setMsg(checkResult, "Player not found.", false);
-    return;
-  }
-
-  const user = users[0];
-  setMsg(checkResult, `Player found: nickname=${user.nickname}, UID=${user.uid}`, true);
-
-  // 3) fetch reports for this user (by uid or nickname)
-  const { data: reports, error: repErr } = await db
+  const { data: reports, error } = await db
     .from("reports")
-    .select("message, created_at, reported_uid, reported_nickname")
-    .or(`reported_uid.eq.${user.uid},reported_nickname.ilike.${user.nickname}`)
+    .select("reported_uid, reported_nickname, report_message, created_at")
+    .or(`reported_uid.eq.${q},reported_nickname.ilike.${q}`)
     .order("created_at", { ascending: false });
 
   setLoading(doCheckBtn, false);
 
-  if (repErr) {
-    setMsg(checkResult, `Player found, but couldn't load reports: ${repErr.message}`, false);
+  if (error) {
+    setMsg(checkResult, error.message, false);
     return;
   }
 
   if (!reports || reports.length === 0) {
-    reportsBlock.innerHTML = `<div class="report-item">No reports for this user.</div>`;
-    show(reportsBlock);
+    setMsg(checkResult, "No reports found for this user.", false);
     return;
   }
+
+  // show summary (top match)
+  const top = reports[0];
+  const displayUid = top.reported_uid ?? "—";
+  const displayNick = top.reported_nickname ?? "—";
+  setMsg(checkResult, `Reports found for: nickname=${displayNick}, UID=${displayUid}`, true);
 
   reportsBlock.innerHTML = reports.map(r => {
     const date = new Date(r.created_at).toLocaleString();
     return `
       <div class="report-item">
-        ${escapeHtml(r.message)}
-        <div class="report-meta">Reported at: ${date}</div>
+        ${escapeHtml(r.report_message)}
+        <div class="report-meta">
+          UID: ${escapeHtml(r.reported_uid ?? "—")} •
+          Nickname: ${escapeHtml(r.reported_nickname ?? "—")} •
+          ${date}
+        </div>
       </div>
     `;
   }).join("");
@@ -150,49 +166,9 @@ doCheckBtn.onclick = async () => {
   show(reportsBlock);
 };
 
-// REPORT USER
-doReportBtn.dataset.label = "Submit report";
-doReportBtn.onclick = async () => {
-  const target = reportTarget.value.trim();
-  const message = reportMessage.value.trim();
-
-  if (!target) {
-    setMsg(reportMsg, "UID or nickname is required.", false);
-    return;
-  }
-  if (!message) {
-    setMsg(reportMsg, "Report message is required.", false);
-    return;
-  }
-
-  setLoading(doReportBtn, true, "Submitting");
-  setMsg(reportMsg, "");
-
-  // Decide if target is UID-like or nickname-like
-  // Simple heuristic: if it has digits only (or mostly), treat as UID
-  const isUid = /^[0-9A-Za-z_-]{3,}$/.test(target) && /\d/.test(target);
-
-  const payload = isUid
-    ? { reported_uid: target, reported_nickname: null, message }
-    : { reported_uid: null, reported_nickname: target, message };
-
-  const { error } = await db.from("reports").insert([payload]);
-
-  setLoading(doReportBtn, false);
-
-  if (error) {
-    setMsg(reportMsg, error.message, false);
-  } else {
-    setMsg(reportMsg, "Report saved. Thanks!", true);
-    reportTarget.value = "";
-    reportMessage.value = "";
-    autoGrow(reportMessage);
-  }
-};
-
-// tiny XSS-safe helper for report text
+// tiny XSS-safe helper
 function escapeHtml(str) {
-  return str.replace(/[&<>"']/g, m => ({
+  return String(str).replace(/[&<>"']/g, m => ({
     "&":"&amp;","<":"&lt;",">":"&gt;",
     "\"":"&quot;","'":"&#039;"
   }[m]));

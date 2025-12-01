@@ -23,7 +23,7 @@
       </div>
     </header>
 
-    <!-- Actions always visible -->
+    <!-- Actions -->
     <section class="card" id="actionsCard">
       <div class="card-header">
         <h2>Actions</h2>
@@ -60,12 +60,18 @@
     <section class="card hidden" id="reportCard">
       <div class="card-header">
         <h2>Report user</h2>
-        <span class="pill">required message</span>
+        <span class="pill">required fields</span>
       </div>
 
       <div class="field">
-        <label for="reportTarget">UID or nickname</label>
-        <input id="reportTarget" placeholder="Enter UID or nickname of player"/>
+        <label for="reportUid">Reported UID (optional)</label>
+        <input id="reportUid" placeholder="Enter UID if known"/>
+      </div>
+
+      <div class="field">
+        <label for="reportNick">Reported nickname (optional)</label>
+        <input id="reportNick" placeholder="Enter nickname if known"/>
+        <div class="hint">You must fill at least UID or nickname.</div>
       </div>
 
       <div class="field">
