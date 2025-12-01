@@ -1,21 +1,15 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-// TODO: paste your values here
+// Your Supabase data (plugged in)
 const SUPABASE_URL = "https://pgcririgwmezvulabvuh.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBnY3Jpcmlnd21lenZ1bGFidnVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2MDg4ODIsImV4cCI6MjA4MDE4NDg4Mn0.z0JTFGLTQBeUr4dzPl-310me-zLU3kGFZLofcKUWT6s";
 
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Elements
-const registerCard = document.getElementById("registerCard");
-const actionsCard  = document.getElementById("actionsCard");
-const checkCard    = document.getElementById("checkCard");
-const reportCard   = document.getElementById("reportCard");
-
-const uidInput  = document.getElementById("uidInput");
-const nickInput = document.getElementById("nickInput");
-const registerBtn = document.getElementById("registerBtn");
-const registerMsg = document.getElementById("registerMsg");
+const actionsCard = document.getElementById("actionsCard");
+const checkCard   = document.getElementById("checkCard");
+const reportCard  = document.getElementById("reportCard");
 
 const checkBtn = document.getElementById("checkBtn");
 const reportBtn = document.getElementById("reportBtn");
@@ -23,15 +17,14 @@ const reportBtn = document.getElementById("reportBtn");
 const checkQuery = document.getElementById("checkQuery");
 const doCheckBtn = document.getElementById("doCheckBtn");
 const checkResult = document.getElementById("checkResult");
+const reportsBlock = document.getElementById("reportsBlock");
 const backFromCheck = document.getElementById("backFromCheck");
 
-const reportedUid = document.getElementById("reportedUid");
-const reason = document.getElementById("reason");
+const reportTarget = document.getElementById("reportTarget");
+const reportMessage = document.getElementById("reportMessage");
 const doReportBtn = document.getElementById("doReportBtn");
 const reportMsg = document.getElementById("reportMsg");
 const backFromReport = document.getElementById("backFromReport");
-
-const currentUserBadge = document.getElementById("currentUserBadge");
 
 // Helpers
 function show(el) { el.classList.remove("hidden"); }
@@ -49,131 +42,158 @@ function setLoading(btn, isLoading, label="") {
 }
 
 // Textarea auto-grow
-function autoGrowTextarea(t) {
+function autoGrow(t) {
   t.style.height = "auto";
   t.style.height = t.scrollHeight + "px";
 }
-reason.addEventListener("input", () => autoGrowTextarea(reason));
-window.addEventListener("load", () => autoGrowTextarea(reason));
-
-// Save current user badge
-function refreshBadge() {
-  const existingUid = localStorage.getItem("current_uid");
-  const existingNick = localStorage.getItem("current_nick");
-  currentUserBadge.textContent = existingUid
-    ? `You: ${existingNick} (${existingUid})`
-    : `Not registered`;
-}
-refreshBadge();
-
-// Register flow
-registerBtn.dataset.label = "Save";
-registerBtn.onclick = async () => {
-  const uid = uidInput.value.trim();
-  const nickname = nickInput.value.trim();
-
-  if (!uid || !nickname) {
-    setMsg(registerMsg, "UID and nickname are required.", false);
-    return;
-  }
-
-  setLoading(registerBtn, true, "Saving");
-  setMsg(registerMsg, "");
-
-  const { error } = await db.from("users").insert([{ uid, nickname }]);
-
-  setLoading(registerBtn, false);
-
-  if (error) {
-    setMsg(registerMsg, error.message, false);
-    return;
-  }
-
-  localStorage.setItem("current_uid", uid);
-  localStorage.setItem("current_nick", nickname);
-
-  setMsg(registerMsg, "Saved! You can now check/report users.");
-  hide(registerCard);
-  show(actionsCard);
-  refreshBadge();
-};
-
-// If already registered in this browser, skip register UI
-if (localStorage.getItem("current_uid")) {
-  hide(registerCard);
-  show(actionsCard);
-}
+reportMessage.addEventListener("input", () => autoGrow(reportMessage));
+window.addEventListener("load", () => autoGrow(reportMessage));
 
 // Navigation
 checkBtn.onclick = () => { hide(actionsCard); show(checkCard); };
 reportBtn.onclick = () => { hide(actionsCard); show(reportCard); };
 
-backFromCheck.onclick = () => { hide(checkCard); show(actionsCard); };
-backFromReport.onclick = () => { hide(reportCard); show(actionsCard); };
+backFromCheck.onclick = () => {
+  hide(checkCard);
+  show(actionsCard);
+  setMsg(checkResult, "");
+  reportsBlock.innerHTML = "";
+  hide(reportsBlock);
+  checkQuery.value = "";
+};
 
-// Check user
+backFromReport.onclick = () => {
+  hide(reportCard);
+  show(actionsCard);
+  setMsg(reportMsg, "");
+  reportTarget.value = "";
+  reportMessage.value = "";
+  autoGrow(reportMessage);
+};
+
+// CHECK USER
 doCheckBtn.dataset.label = "Find";
 doCheckBtn.onclick = async () => {
   const q = checkQuery.value.trim();
   if (!q) {
     setMsg(checkResult, "Enter UID or nickname.", false);
+    hide(reportsBlock);
     return;
   }
 
   setLoading(doCheckBtn, true, "Searching");
   setMsg(checkResult, "");
+  reportsBlock.innerHTML = "";
+  hide(reportsBlock);
 
-  let { data, error } = await db
+  // 1) find user by UID
+  let { data: users, error } = await db
     .from("users")
     .select("uid, nickname")
     .eq("uid", q)
     .limit(1);
 
-  if (!error && (!data || data.length === 0)) {
-    ({ data, error } = await db
+  // 2) if not found, try nickname
+  if (!error && (!users || users.length === 0)) {
+    ({ data: users, error } = await db
       .from("users")
       .select("uid, nickname")
       .ilike("nickname", q)
       .limit(1));
   }
 
+  if (error) {
+    setLoading(doCheckBtn, false);
+    setMsg(checkResult, error.message, false);
+    return;
+  }
+
+  if (!users || users.length === 0) {
+    setLoading(doCheckBtn, false);
+    setMsg(checkResult, "Player not found.", false);
+    return;
+  }
+
+  const user = users[0];
+  setMsg(checkResult, `Player found: nickname=${user.nickname}, UID=${user.uid}`, true);
+
+  // 3) fetch reports for this user (by uid or nickname)
+  const { data: reports, error: repErr } = await db
+    .from("reports")
+    .select("message, created_at, reported_uid, reported_nickname")
+    .or(`reported_uid.eq.${user.uid},reported_nickname.ilike.${user.nickname}`)
+    .order("created_at", { ascending: false });
+
   setLoading(doCheckBtn, false);
 
-  if (error) return setMsg(checkResult, error.message, false);
-
-  if (!data || data.length === 0) {
-    setMsg(checkResult, "Player not found.", false);
-  } else {
-    const u = data[0];
-    setMsg(checkResult, `Player found: nickname=${u.nickname}, UID=${u.uid}`);
+  if (repErr) {
+    setMsg(checkResult, `Player found, but couldn't load reports: ${repErr.message}`, false);
+    return;
   }
+
+  if (!reports || reports.length === 0) {
+    reportsBlock.innerHTML = `<div class="report-item">No reports for this user.</div>`;
+    show(reportsBlock);
+    return;
+  }
+
+  reportsBlock.innerHTML = reports.map(r => {
+    const date = new Date(r.created_at).toLocaleString();
+    return `
+      <div class="report-item">
+        ${escapeHtml(r.message)}
+        <div class="report-meta">Reported at: ${date}</div>
+      </div>
+    `;
+  }).join("");
+
+  show(reportsBlock);
 };
 
-// Report user
+// REPORT USER
 doReportBtn.dataset.label = "Submit report";
 doReportBtn.onclick = async () => {
-  const ruid = reportedUid.value.trim();
-  if (!ruid) {
-    setMsg(reportMsg, "Reported UID is required.", false);
+  const target = reportTarget.value.trim();
+  const message = reportMessage.value.trim();
+
+  if (!target) {
+    setMsg(reportMsg, "UID or nickname is required.", false);
+    return;
+  }
+  if (!message) {
+    setMsg(reportMsg, "Report message is required.", false);
     return;
   }
 
   setLoading(doReportBtn, true, "Submitting");
   setMsg(reportMsg, "");
 
-  const reporter_uid = localStorage.getItem("current_uid") || null;
-  const { error } = await db
-    .from("reports")
-    .insert([{ reported_uid: ruid, reporter_uid, reason: reason.value.trim() }]);
+  // Decide if target is UID-like or nickname-like
+  // Simple heuristic: if it has digits only (or mostly), treat as UID
+  const isUid = /^[0-9A-Za-z_-]{3,}$/.test(target) && /\d/.test(target);
+
+  const payload = isUid
+    ? { reported_uid: target, reported_nickname: null, message }
+    : { reported_uid: null, reported_nickname: target, message };
+
+  const { error } = await db.from("reports").insert([payload]);
 
   setLoading(doReportBtn, false);
 
   if (error) {
     setMsg(reportMsg, error.message, false);
   } else {
-    setMsg(reportMsg, "Report saved. Thanks!");
-    reportedUid.value = "";
-    reason.value = "";
-    autoGrowTextarea(reason);
+    setMsg(reportMsg, "Report saved. Thanks!", true);
+    reportTarget.value = "";
+    reportMessage.value = "";
+    autoGrow(reportMessage);
   }
 };
+
+// tiny XSS-safe helper for report text
+function escapeHtml(str) {
+  return str.replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",
+    "\"":"&quot;","'":"&#039;"
+  }[m]));
+}

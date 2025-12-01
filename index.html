@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>User Checker</title>
 
-  <!-- Modern font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -19,39 +18,16 @@
         <div class="logo"></div>
         <div>
           <h1>User Checker</h1>
-          <div class="subtitle">Register, check and report players</div>
+          <div class="subtitle">Check players and submit reports</div>
         </div>
       </div>
-      <div class="status" id="currentUserBadge"></div>
     </header>
 
-    <!-- Register -->
-    <section class="card" id="registerCard">
-      <div class="card-header">
-        <h2>Register user</h2>
-        <span class="pill">required</span>
-      </div>
-
-      <div class="grid-2">
-        <div class="field">
-          <label for="uidInput">UID</label>
-          <input id="uidInput" placeholder="Enter UID" autocomplete="off"/>
-        </div>
-        <div class="field">
-          <label for="nickInput">Nickname</label>
-          <input id="nickInput" placeholder="Enter nickname" autocomplete="off"/>
-        </div>
-      </div>
-
-      <button class="btn btn-primary" id="registerBtn">Save</button>
-      <div class="msg" id="registerMsg"></div>
-    </section>
-
-    <!-- Actions -->
-    <section class="card hidden" id="actionsCard">
+    <!-- Actions always visible -->
+    <section class="card" id="actionsCard">
       <div class="card-header">
         <h2>Actions</h2>
-        <span class="pill">choose one</span>
+        <span class="pill">start here</span>
       </div>
 
       <div class="action-row">
@@ -73,7 +49,9 @@
       </div>
 
       <button class="btn btn-primary" id="doCheckBtn">Find</button>
+
       <div class="msg" id="checkResult"></div>
+      <div id="reportsBlock" class="reports hidden"></div>
 
       <button class="btn btn-ghost" id="backFromCheck">Back</button>
     </section>
@@ -82,17 +60,17 @@
     <section class="card hidden" id="reportCard">
       <div class="card-header">
         <h2>Report user</h2>
-        <span class="pill">required UID</span>
+        <span class="pill">required message</span>
       </div>
 
       <div class="field">
-        <label for="reportedUid">Reported UID</label>
-        <input id="reportedUid" placeholder="UID of reported player"/>
+        <label for="reportTarget">UID or nickname</label>
+        <input id="reportTarget" placeholder="Enter UID or nickname of player"/>
       </div>
 
       <div class="field">
-        <label for="reason">Reason (optional)</label>
-        <textarea id="reason" rows="1" placeholder="Describe what happened..."></textarea>
+        <label for="reportMessage">Report message</label>
+        <textarea id="reportMessage" rows="1" placeholder="Why are you reporting this user?"></textarea>
         <div class="hint">This box auto-expands as you type.</div>
       </div>
 
