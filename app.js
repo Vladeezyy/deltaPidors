@@ -90,7 +90,32 @@ function autoGrow(t){
 }
 reportNotes.addEventListener("input", () => autoGrow(reportNotes));
 window.addEventListener("load", () => autoGrow(reportNotes));
+async function preprocessImage(file){
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+  await new Promise(res => img.onload = res);
 
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = img.width;
+  canvas.height = img.height;
+
+  // draw + grayscale + boost contrast
+  ctx.drawImage(img, 0, 0);
+  const { data } = ctx.getImageData(0,0,canvas.width, canvas.height);
+
+  for (let i=0;i<data.length;i+=4){
+    const r=data[i], g=data[i+1], b=data[i+2];
+    let v = (r*0.299 + g*0.587 + b*0.114);
+    // contrast boost
+    v = v > 140 ? 255 : v < 100 ? 0 : v;
+    data[i]=data[i+1]=data[i+2]=v;
+  }
+  ctx.putImageData(new ImageData(data, canvas.width, canvas.height),0,0);
+
+  return canvas;
+}
 // Navigation
 checkBtn.onclick  = () => { hide(actionsCard); show(checkCard); };
 reportBtn.onclick = () => { hide(actionsCard); show(reportCard); };
@@ -128,7 +153,16 @@ async function runOcr(file, previewEl, boxEl, extractedEl, rawEl, kind){
   extractedEl.textContent = "Reading...";
   rawEl.textContent = "";
 
-  const { data: { text } } = await Tesseract.recognize(file, "eng");
+  const { data: { text } } = await Tesseract.recognize(
+    canvas,
+    "eng",
+    {
+      tessedit_char_whitelist: kind === "uid"
+        ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
+        : "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_- ",
+      psm: 7 // treat as a single line
+    }
+  );
   rawEl.textContent = text;
 
   if (kind === "uid") {
@@ -239,7 +273,7 @@ doCheckBtn.onclick = async () => {
 
   const { data: reports, error } = await db
     .from("reports")
-    .select("reported_uid, reported_nickname, map, character, reason, notes, created_at")
+    .select("id, reported_uid, reported_nickname, map, character, reason, notes, banned, created_at")
     .or(`reported_uid.eq.${q},reported_nickname.ilike.${q}`)
     .order("created_at", { ascending: false });
 
@@ -284,7 +318,7 @@ async function loadAllEntries(){
 
   const { data, error } = await db
     .from("reports")
-    .select("reported_uid, reported_nickname, map, character, reason, notes, created_at")
+    .select("reported_uid, reported_nickname, map, character, reason, notes, banned, created_at")
     .order("created_at", { ascending: false });
 
   if (error){
@@ -301,39 +335,53 @@ function getDisplayName(e){
   return (e.reported_nickname || e.reported_uid || "").toLowerCase();
 }
 
+function dedupeLatestPerUser(entries){
+  const map = new Map();
+  for (const e of entries) {
+    const key = (e.reported_uid || e.reported_nickname || "unknown").toLowerCase();
+    const prev = map.get(key);
+    if (!prev || new Date(e.created_at) > new Date(prev.created_at)) {
+      map.set(key, e);
+    }
+  }
+  return [...map.values()];
+}
+
 function renderEntries(){
-  const sorted = [...allEntries];
+  // ✅ dedupe to 1 row per user (latest)
+  const deduped = dedupeLatestPerUser(allEntries);
+
+  const sorted = [...deduped];
   const mode = sortSelect.value;
 
   sorted.sort((a,b)=>{
-    const nameA = getDisplayName(a);
-    const nameB = getDisplayName(b);
-    const mapA = (a.map||"").toLowerCase();
-    const mapB = (b.map||"").toLowerCase();
-    const charA = (a.character||"").toLowerCase();
-    const charB = (b.character||"").toLowerCase();
     const dateA = new Date(a.created_at).getTime();
     const dateB = new Date(b.created_at).getTime();
 
-    switch(mode){
-      case "date_asc":  return dateA - dateB;
-      case "date_desc": return dateB - dateA;
-      case "name_asc":  return nameA.localeCompare(nameB);
-      case "name_desc": return nameB.localeCompare(nameA);
-      case "map_asc":   return mapA.localeCompare(mapB);
-      case "map_desc":  return mapB.localeCompare(mapA);
-      case "char_asc":  return charA.localeCompare(charB);
-      case "char_desc": return charB.localeCompare(charA);
-      default: return dateB - dateA;
+    if (mode === "date_asc") return dateA - dateB;
+    if (mode === "date_desc") return dateB - dateA;
+
+    if (mode === "type_cheater") {
+      if (a.reason !== b.reason) return a.reason === "cheater" ? -1 : 1;
+      return dateB - dateA;
     }
+    if (mode === "type_huesos") {
+      if (a.reason !== b.reason) return a.reason === "huesos" ? -1 : 1;
+      return dateB - dateA;
+    }
+
+    return dateB - dateA;
   });
 
   listCount.textContent = `${sorted.length} entries`;
 
+  // List cards
   listView.innerHTML = sorted.map(e=>{
     const date = new Date(e.created_at).toLocaleString();
     const name = e.reported_nickname || "Unknown";
     const uid  = e.reported_uid || "—";
+    const bannedBadge = e.banned ? `<span class="badge-banned">BANNED</span>` : "";
+
     return `
       <div class="entry-card">
         <div class="entry-top">
@@ -341,32 +389,68 @@ function renderEntries(){
             ${escapeHtml(name)}
             <span class="tag">UID: ${escapeHtml(uid)}</span>
             <span class="tag">${escapeHtml(e.reason)}</span>
+            ${bannedBadge}
           </div>
           <div class="entry-tags">
             <span class="tag">Map: ${escapeHtml(e.map || "—")}</span>
             <span class="tag">Character: ${escapeHtml(e.character || "—")}</span>
           </div>
         </div>
-        <div class="entry-reason">${escapeHtml(e.notes)}</div>
+        <div class="entry-reason">${escapeHtml(e.notes || "")}</div>
         <div class="entry-date">${date}</div>
       </div>
     `;
   }).join("");
 
-  tableBody.innerHTML = sorted.map(e=>{
+  // Table rows (with banned toggle)
+  tableBody.innerHTML = sorted.map((e, idx)=>{
     const date = new Date(e.created_at).toLocaleString();
     const name = e.reported_nickname || "Unknown";
     const uid  = e.reported_uid || "—";
+    const bannedBadge = e.banned ? `<div class="badge-banned">BANNED</div>` : "";
+    const toggleText = e.banned ? "Remove banned" : "Mark banned";
+
     return `
-      <tr>
-        <td><strong>${escapeHtml(name)}</strong><br/><span class="muted">UID: ${escapeHtml(uid)}</span></td>
+      <tr data-id="${e.id}">
+        <td>
+          <strong>${escapeHtml(name)}</strong><br/>
+          <span class="muted">UID: ${escapeHtml(uid)}</span><br/>
+          ${bannedBadge}
+        </td>
         <td>${escapeHtml(e.reason)}</td>
         <td>${escapeHtml(e.map || "—")}</td>
         <td>${escapeHtml(e.character || "—")}</td>
-        <td>${escapeHtml(e.notes)}</td>
-        <td>${date}</td>
+        <td>${escapeHtml(e.notes || "")}</td>
+        <td>
+          ${date}<br/>
+          <button class="btn btn-danger btn-banned" data-toggle-banned="${e.id}">
+            ${toggleText}
+          </button>
+        </td>
       </tr>`;
   }).join("");
+
+  // attach click handlers for banned toggle
+  document.querySelectorAll("[data-toggle-banned]").forEach(btn=>{
+    btn.onclick = async () => {
+      const id = btn.getAttribute("data-toggle-banned");
+      const row = allEntries.find(x => String(x.id) === String(id));
+      if (!row) return;
+
+      const newVal = !row.banned;
+      const { error } = await db
+        .from("reports")
+        .update({ banned: newVal })
+        .eq("id", id);
+
+      if (!error){
+        row.banned = newVal; // update local cache
+        renderEntries();     // rerender
+      } else {
+        alert(error.message);
+      }
+    };
+  });
 }
 
 sortSelect.onchange = renderEntries;
