@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>User Checker</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+    h1 { margin-bottom: 8px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 12px 0; }
+    input, textarea, button { width: 100%; padding: 10px; margin: 6px 0; font-size: 16px; }
+    button { cursor: pointer; }
+    .row { display:flex; gap:8px; }
+    .row > button { flex:1; }
+    .hidden { display:none; }
+    .ok { color: #0a7; }
+    .err { color: #c33; }
+  </style>
+</head>
+<body>
+  <h1>User Checker</h1>
+
+  <!-- Step 1: register -->
+  <div class="card" id="registerCard">
+    <h2>Register user</h2>
+    <input id="uidInput" placeholder="UID (required)"/>
+    <input id="nickInput" placeholder="Nickname (required)"/>
+    <button id="registerBtn">Save</button>
+    <div id="registerMsg"></div>
+  </div>
+
+  <!-- Main actions -->
+  <div class="card hidden" id="actionsCard">
+    <h2>Actions</h2>
+    <div class="row">
+      <button id="checkBtn">Check user</button>
+      <button id="reportBtn">Report user</button>
+    </div>
+  </div>
+
+  <!-- Check form -->
+  <div class="card hidden" id="checkCard">
+    <h2>Check user</h2>
+    <input id="checkQuery" placeholder="Enter UID or nickname"/>
+    <button id="doCheckBtn">Find</button>
+    <div id="checkResult"></div>
+    <button id="backFromCheck">Back</button>
+  </div>
+
+  <!-- Report form -->
+  <div class="card hidden" id="reportCard">
+    <h2>Report user</h2>
+    <input id="reportedUid" placeholder="Reported user's UID (required)"/>
+    <textarea id="reason" placeholder="Reason (optional)"></textarea>
+    <button id="doReportBtn">Submit report</button>
+    <div id="reportMsg"></div>
+    <button id="backFromReport">Back</button>
+  </div>
+
+  <!-- Supabase JS -->
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
