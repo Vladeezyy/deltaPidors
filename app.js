@@ -119,7 +119,14 @@ async function preprocessImage(file){
 // Navigation
 checkBtn.onclick  = () => { hide(actionsCard); show(checkCard); };
 reportBtn.onclick = () => { hide(actionsCard); show(reportCard); };
-listBtn.onclick   = () => { hide(actionsCard); show(listCard); loadAllEntries(); };
+listBtn.onclick   = () => {
+  hide(actionsCard);
+  show(listCard);
+  // force default view so list and table are not shown together
+  show(listView);
+  hide(tableView);
+  loadAllEntries();
+};
 
 backFromCheck.onclick = () => {
   hide(checkCard); show(actionsCard);
@@ -145,25 +152,40 @@ backFromList.onclick = () => {
 
 // -------- OCR logic (client-side AI) --------
 async function runOcr(file, previewEl, boxEl, extractedEl, rawEl, kind){
-  if (!file) return;
+  if (!file) return "";
 
-  const url = URL.createObjectURL(file);
-  previewEl.src = url;
-  show(boxEl);
-  extractedEl.textContent = "Reading...";
-  rawEl.textContent = "";
+  let text = "";
 
-  const { data: { text } } = await Tesseract.recognize(
-    canvas,
-    "eng",
-    {
-      tessedit_char_whitelist: kind === "uid"
-        ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
-        : "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_- ",
-      psm: 7 // treat as a single line
-    }
-  );
-  rawEl.textContent = text;
+  try {
+    const url = URL.createObjectURL(file);
+    previewEl.src = url;
+    show(boxEl);
+    extractedEl.textContent = "Reading...";
+    rawEl.textContent = "";
+
+    // Preprocess the image into a canvas (grayscale + contrast boost)
+    const canvas = await preprocessImage(file);
+
+    const result = await Tesseract.recognize(
+      canvas,
+      "eng",
+      {
+        tessedit_char_whitelist: kind === "uid"
+          ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
+          : "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_- ",
+        psm: 7 // treat as a single line
+      }
+    );
+
+    text = result?.data?.text || "";
+    rawEl.textContent = text;
+
+  } catch (err) {
+    console.error("OCR error:", err);
+    extractedEl.textContent = "Error reading image";
+    rawEl.textContent = err?.message || String(err);
+    return "";
+  }
 
   if (kind === "uid") {
     // Heuristic: pick longest alphanumeric chunk containing digits
@@ -184,6 +206,8 @@ async function runOcr(file, previewEl, boxEl, extractedEl, rawEl, kind){
     extractedEl.textContent = best || "Not found";
     return best || "";
   }
+
+  return "";
 }
 
 let lastUidOcr = "";
@@ -318,7 +342,7 @@ async function loadAllEntries(){
 
   const { data, error } = await db
     .from("reports")
-    .select("reported_uid, reported_nickname, map, character, reason, notes, banned, created_at")
+    .select("id, reported_uid, reported_nickname, map, character, reason, notes, banned, created_at")
     .order("created_at", { ascending: false });
 
   if (error){

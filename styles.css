@@ -206,16 +206,6 @@ textarea {
   color: #ffd7df;
 }
 
-.action-row {
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-@media (max-width: 640px){
-  .action-row { grid-template-columns: 1fr; }
-}
-
 .msg {
   font-size: 14px;
   padding-top: 4px;
@@ -236,15 +226,6 @@ textarea {
   margin-right: 8px;
 }
 @keyframes spin { to { transform: rotate(360deg);} }
-/* ... keep everything you already had ... */
-
-/* auto-grow textareas / block manual resize */
-textarea {
-  resize: none;
-  overflow: hidden;
-  line-height: 1.4;
-  min-height: 44px;
-}
 
 /* reports list styling */
 .reports {
@@ -276,12 +257,17 @@ select {
 }
 
 .list-controls {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 10px;
-  align-items: end;
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.list-controls .field {
+  min-width: 220px;
 }
 
+/* view toggle */
 .view-toggle {
   display: flex;
   gap: 6px;
