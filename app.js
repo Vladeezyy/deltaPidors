@@ -90,7 +90,7 @@ function autoGrow(t){
 }
 reportNotes.addEventListener("input", () => autoGrow(reportNotes));
 window.addEventListener("load", () => autoGrow(reportNotes));
-async function preprocessImage(file){
+async function preprocessImage(file, soft = false){
   const img = new Image();
   img.src = URL.createObjectURL(file);
   await new Promise(res => img.onload = res);
@@ -108,8 +108,16 @@ async function preprocessImage(file){
   for (let i=0;i<data.length;i+=4){
     const r=data[i], g=data[i+1], b=data[i+2];
     let v = (r*0.299 + g*0.587 + b*0.114);
-    // contrast boost
-    v = v > 140 ? 255 : v < 100 ? 0 : v;
+
+    if (!soft) {
+      // Strong binarization for UID (best for digits)
+      v = v > 140 ? 255 : v < 100 ? 0 : v;
+    } else {
+      // Soft contrast for nicknames (keeps Chinese/emoji strokes)
+      v = v * 1.15;
+      if (v > 255) v = 255;
+    }
+
     data[i]=data[i+1]=data[i+2]=v;
   }
   ctx.putImageData(new ImageData(data, canvas.width, canvas.height),0,0);
@@ -164,16 +172,26 @@ async function runOcr(file, previewEl, boxEl, extractedEl, rawEl, kind){
     rawEl.textContent = "";
 
     // Preprocess the image into a canvas (grayscale + contrast boost)
-    const canvas = await preprocessImage(file);
+    const canvas = await preprocessImage(file, kind === "nick");
+
+    // For nicknames, enable multiple CJK languages + English to handle mixed scripts/symbols.
+    const lang = kind === "nick" ? "chi_sim+chi_tra+jpn+kor+eng" : "eng";
 
     const result = await Tesseract.recognize(
       canvas,
-      "eng",
+      lang,
       {
-        tessedit_char_whitelist: kind === "uid"
-          ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
-          : "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_- ",
-        psm: 7 // treat as a single line
+        langPath: "https://tessdata.projectnaptha.com/4.0.0",
+        // IMPORTANT: whitelist ONLY for UID. For nicknames we allow ANY symbols/emojis.
+        ...(kind === "uid"
+          ? {
+              tessedit_char_whitelist:
+                "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-",
+              psm: 7 // single line text
+            }
+          : {
+              psm: 6 // block / mixed characters (Chinese, emojis, symbols)
+            })
       }
     );
 
@@ -200,9 +218,14 @@ async function runOcr(file, previewEl, boxEl, extractedEl, rawEl, kind){
   }
 
   if (kind === "nick") {
-    // Heuristic: take first non-empty line that isn't pure numbers
-    const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
-    const best = lines.find(l => !/^\d+$/.test(l)) || "";
+    // Heuristic: take the first non-empty line as nickname.
+    // We allow ANY characters: Chinese, emojis, cute symbols, punctuation, etc.
+    const lines = text
+      .split("\n")
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
+    const best = lines[0] || "";
     extractedEl.textContent = best || "Not found";
     return best || "";
   }
