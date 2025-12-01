@@ -18,7 +18,7 @@
         <div class="logo"></div>
         <div>
           <h1>User Checker</h1>
-          <div class="subtitle">Check players and submit reports</div>
+          <div class="subtitle">Check players, report cheaters & bad behavior</div>
         </div>
       </div>
     </header>
@@ -64,32 +64,109 @@
         <span class="pill">required fields</span>
       </div>
 
+      <!-- UID with OCR -->
       <div class="field">
         <label for="reportUid">Reported UID (optional)</label>
         <input id="reportUid" placeholder="Enter UID if known"/>
+        <div class="inline">
+          <input type="file" id="uidShot" accept="image/*" class="file"/>
+          <button class="btn btn-ghost btn-small" id="readUidBtn">Read UID from screenshot</button>
+        </div>
+        <div class="ocr hidden" id="uidOcrBox">
+          <img id="uidPreview" class="preview" />
+          <div class="ocr-row">
+            <div>
+              <div class="ocr-label">Extracted UID</div>
+              <div class="ocr-value" id="uidExtracted">—</div>
+            </div>
+            <button class="btn btn-primary btn-small" id="useUidBtn">Use extracted</button>
+          </div>
+          <details>
+            <summary>OCR text</summary>
+            <pre id="uidRawText"></pre>
+          </details>
+        </div>
       </div>
 
+      <!-- Nickname with OCR -->
       <div class="field">
         <label for="reportNick">Reported nickname (optional)</label>
         <input id="reportNick" placeholder="Enter nickname if known"/>
         <div class="hint">You must fill at least UID or nickname.</div>
+
+        <div class="inline">
+          <input type="file" id="nickShot" accept="image/*" class="file"/>
+          <button class="btn btn-ghost btn-small" id="readNickBtn">Read nickname from screenshot</button>
+        </div>
+        <div class="ocr hidden" id="nickOcrBox">
+          <img id="nickPreview" class="preview" />
+          <div class="ocr-row">
+            <div>
+              <div class="ocr-label">Extracted nickname</div>
+              <div class="ocr-value" id="nickExtracted">—</div>
+            </div>
+            <button class="btn btn-primary btn-small" id="useNickBtn">Use extracted</button>
+          </div>
+          <details>
+            <summary>OCR text</summary>
+            <pre id="nickRawText"></pre>
+          </details>
+        </div>
       </div>
 
+      <!-- Dropdowns -->
       <div class="grid-2">
         <div class="field">
           <label for="reportMap">Map (required)</label>
-          <input id="reportMap" placeholder="e.g. Dust2, Mirage..." />
+          <select id="reportMap">
+            <option value="">Select map…</option>
+            <option>Zero Dam</option>
+            <option>Zero Dam (Night mode)</option>
+            <option>Zero Dam (Easy)</option>
+            <option>Brakkesh</option>
+            <option>Layali Grove (Easy)</option>
+            <option>Layali Grove (Normal)</option>
+            <option>Space City (Normal)</option>
+            <option>Space City (Hard)</option>
+            <option>Tide Prison</option>
+          </select>
         </div>
+
         <div class="field">
           <label for="reportChar">Character (optional)</label>
-          <input id="reportChar" placeholder="e.g. Sniper, Mage..." />
+          <select id="reportChar">
+            <option value="">Select character…</option>
+            <option>Luna</option>
+            <option>Hackclaw</option>
+            <option>Gizmo</option>
+            <option>D-Wolf</option>
+            <option>Nox</option>
+            <option>Vyron</option>
+            <option>Tempest</option>
+            <option>Uluru</option>
+            <option>Shepherd</option>
+            <option>Stinger</option>
+            <option>Sineva</option>
+            <option>Toxic</option>
+          </select>
         </div>
       </div>
 
+      <!-- Reason type -->
       <div class="field">
-        <label for="reportMessage">Report reason (required)</label>
-        <textarea id="reportMessage" rows="1" placeholder="Why are you reporting this user?"></textarea>
-        <div class="hint">This box auto-expands as you type.</div>
+        <label for="reportReason">Reason type (required)</label>
+        <select id="reportReason">
+          <option value="">Select reason…</option>
+          <option value="cheater">Cheater</option>
+          <option value="huesos">Huesos (bad behavior)</option>
+        </select>
+      </div>
+
+      <!-- Notes -->
+      <div class="field">
+        <label for="reportNotes">Notes (required)</label>
+        <textarea id="reportNotes" rows="1" placeholder="Extra details / what happened"></textarea>
+        <div class="hint">Auto-expands as you type.</div>
       </div>
 
       <button class="btn btn-danger" id="doReportBtn">Submit report</button>
@@ -98,7 +175,7 @@
       <button class="btn btn-ghost" id="backFromReport">Back</button>
     </section>
 
-    <!-- LIST OF PIDARS -->
+    <!-- LIST -->
     <section class="card hidden" id="listCard">
       <div class="card-header">
         <h2>List of pidars</h2>
@@ -134,9 +211,10 @@
             <thead>
               <tr>
                 <th>Name / UID</th>
+                <th>Reason</th>
                 <th>Map</th>
                 <th>Character</th>
-                <th>Reason</th>
+                <th>Notes</th>
                 <th>Date</th>
               </tr>
             </thead>
@@ -149,9 +227,10 @@
 
       <button class="btn btn-ghost" id="backFromList">Back</button>
     </section>
-
   </div>
 
-  <script type="module" src="./app.js?v=5"></script>
+  <!-- Tesseract.js for OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script type="module" src="./app.js?v=6"></script>
 </body>
 </html>

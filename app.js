@@ -12,29 +12,48 @@ const checkCard   = document.getElementById("checkCard");
 const reportCard  = document.getElementById("reportCard");
 const listCard    = document.getElementById("listCard");
 
-// Buttons nav
+// Nav
 const checkBtn  = document.getElementById("checkBtn");
 const reportBtn = document.getElementById("reportBtn");
 const listBtn   = document.getElementById("listBtn");
 
-// Check elements
+// Check
 const checkQuery   = document.getElementById("checkQuery");
 const doCheckBtn   = document.getElementById("doCheckBtn");
 const checkResult  = document.getElementById("checkResult");
 const reportsBlock = document.getElementById("reportsBlock");
 const backFromCheck= document.getElementById("backFromCheck");
 
-// Report elements
+// Report fields
 const reportUid     = document.getElementById("reportUid");
 const reportNick    = document.getElementById("reportNick");
 const reportMap     = document.getElementById("reportMap");
 const reportChar    = document.getElementById("reportChar");
-const reportMessage = document.getElementById("reportMessage");
+const reportReason  = document.getElementById("reportReason");
+const reportNotes   = document.getElementById("reportNotes");
 const doReportBtn   = document.getElementById("doReportBtn");
 const reportMsg     = document.getElementById("reportMsg");
 const backFromReport= document.getElementById("backFromReport");
 
-// List elements
+// OCR UID
+const uidShot = document.getElementById("uidShot");
+const readUidBtn = document.getElementById("readUidBtn");
+const uidOcrBox = document.getElementById("uidOcrBox");
+const uidPreview = document.getElementById("uidPreview");
+const uidExtracted = document.getElementById("uidExtracted");
+const uidRawText = document.getElementById("uidRawText");
+const useUidBtn = document.getElementById("useUidBtn");
+
+// OCR Nick
+const nickShot = document.getElementById("nickShot");
+const readNickBtn = document.getElementById("readNickBtn");
+const nickOcrBox = document.getElementById("nickOcrBox");
+const nickPreview = document.getElementById("nickPreview");
+const nickExtracted = document.getElementById("nickExtracted");
+const nickRawText = document.getElementById("nickRawText");
+const useNickBtn = document.getElementById("useNickBtn");
+
+// List
 const sortSelect   = document.getElementById("sortSelect");
 const listViewBtn  = document.getElementById("listViewBtn");
 const tableViewBtn = document.getElementById("tableViewBtn");
@@ -65,14 +84,12 @@ function escapeHtml(str){
     "\"":"&quot;","'":"&#039;"
   }[m]));
 }
-
-// Textarea auto-grow
 function autoGrow(t){
   t.style.height = "auto";
   t.style.height = t.scrollHeight + "px";
 }
-reportMessage.addEventListener("input", () => autoGrow(reportMessage));
-window.addEventListener("load", () => autoGrow(reportMessage));
+reportNotes.addEventListener("input", () => autoGrow(reportNotes));
+window.addEventListener("load", () => autoGrow(reportNotes));
 
 // Navigation
 checkBtn.onclick  = () => { hide(actionsCard); show(checkCard); };
@@ -88,8 +105,11 @@ backFromCheck.onclick = () => {
 backFromReport.onclick = () => {
   hide(reportCard); show(actionsCard);
   setMsg(reportMsg, "");
-  reportUid.value=""; reportNick.value=""; reportMap.value=""; reportChar.value="";
-  reportMessage.value=""; autoGrow(reportMessage);
+  reportUid.value=""; reportNick.value="";
+  reportMap.value=""; reportChar.value="";
+  reportReason.value=""; reportNotes.value="";
+  autoGrow(reportNotes);
+  hide(uidOcrBox); hide(nickOcrBox);
 };
 
 backFromList.onclick = () => {
@@ -98,14 +118,68 @@ backFromList.onclick = () => {
   setMsg(listMsg, "");
 };
 
-// REPORT USER
+// -------- OCR logic (client-side AI) --------
+async function runOcr(file, previewEl, boxEl, extractedEl, rawEl, kind){
+  if (!file) return;
+
+  const url = URL.createObjectURL(file);
+  previewEl.src = url;
+  show(boxEl);
+  extractedEl.textContent = "Reading...";
+  rawEl.textContent = "";
+
+  const { data: { text } } = await Tesseract.recognize(file, "eng");
+  rawEl.textContent = text;
+
+  if (kind === "uid") {
+    // Heuristic: pick longest alphanumeric chunk containing digits
+    const candidates = text
+      .replace(/\s+/g, " ")
+      .match(/[A-Za-z0-9_-]{4,}/g) || [];
+    const best = candidates
+      .filter(c => /\d/.test(c))
+      .sort((a,b)=>b.length-a.length)[0];
+    extractedEl.textContent = best || "Not found";
+    return best || "";
+  }
+
+  if (kind === "nick") {
+    // Heuristic: take first non-empty line that isn't pure numbers
+    const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
+    const best = lines.find(l => !/^\d+$/.test(l)) || "";
+    extractedEl.textContent = best || "Not found";
+    return best || "";
+  }
+}
+
+let lastUidOcr = "";
+let lastNickOcr = "";
+
+readUidBtn.onclick = async () => {
+  const file = uidShot.files?.[0];
+  lastUidOcr = await runOcr(file, uidPreview, uidOcrBox, uidExtracted, uidRawText, "uid");
+};
+useUidBtn.onclick = () => {
+  if (lastUidOcr) reportUid.value = lastUidOcr;
+};
+
+readNickBtn.onclick = async () => {
+  const file = nickShot.files?.[0];
+  lastNickOcr = await runOcr(file, nickPreview, nickOcrBox, nickExtracted, nickRawText, "nick");
+};
+useNickBtn.onclick = () => {
+  if (lastNickOcr) reportNick.value = lastNickOcr;
+};
+
+// -------- REPORT USER --------
 doReportBtn.dataset.label = "Submit report";
 doReportBtn.onclick = async () => {
   const uid = reportUid.value.trim() || null;
   const nickname = reportNick.value.trim() || null;
-  const map = reportMap.value.trim();
-  const character = reportChar.value.trim() || null;
-  const message = reportMessage.value.trim();
+  const map = reportMap.value;
+  const character = reportChar.value || null;
+  const reason = reportReason.value;
+  const notes = reportNotes.value.trim();
 
   if (!uid && !nickname) {
     setMsg(reportMsg, "Please enter at least UID or nickname.", false);
@@ -115,8 +189,12 @@ doReportBtn.onclick = async () => {
     setMsg(reportMsg, "Map is required.", false);
     return;
   }
-  if (!message) {
-    setMsg(reportMsg, "Report reason is required.", false);
+  if (!reason) {
+    setMsg(reportMsg, "Reason type is required.", false);
+    return;
+  }
+  if (!notes) {
+    setMsg(reportMsg, "Notes are required.", false);
     return;
   }
 
@@ -128,7 +206,8 @@ doReportBtn.onclick = async () => {
     reported_nickname: nickname,
     map,
     character,
-    report_message: message
+    reason,
+    notes
   }]);
 
   setLoading(doReportBtn, false);
@@ -137,12 +216,15 @@ doReportBtn.onclick = async () => {
     setMsg(reportMsg, error.message, false);
   } else {
     setMsg(reportMsg, "Report saved. Thanks!", true);
-    reportUid.value=""; reportNick.value=""; reportMap.value=""; reportChar.value="";
-    reportMessage.value=""; autoGrow(reportMessage);
+    reportUid.value=""; reportNick.value="";
+    reportMap.value=""; reportChar.value="";
+    reportReason.value=""; reportNotes.value="";
+    autoGrow(reportNotes);
+    hide(uidOcrBox); hide(nickOcrBox);
   }
 };
 
-// CHECK USER
+// -------- CHECK USER --------
 doCheckBtn.dataset.label = "Find";
 doCheckBtn.onclick = async () => {
   const q = checkQuery.value.trim();
@@ -157,7 +239,7 @@ doCheckBtn.onclick = async () => {
 
   const { data: reports, error } = await db
     .from("reports")
-    .select("reported_uid, reported_nickname, map, character, report_message, created_at")
+    .select("reported_uid, reported_nickname, map, character, reason, notes, created_at")
     .or(`reported_uid.eq.${q},reported_nickname.ilike.${q}`)
     .order("created_at", { ascending: false });
 
@@ -179,7 +261,7 @@ doCheckBtn.onclick = async () => {
     const date = new Date(r.created_at).toLocaleString();
     return `
       <div class="report-item">
-        ${escapeHtml(r.report_message)}
+        <strong>${escapeHtml(r.reason)}</strong> — ${escapeHtml(r.notes)}
         <div class="report-meta">
           UID: ${escapeHtml(r.reported_uid ?? "—")} •
           Nickname: ${escapeHtml(r.reported_nickname ?? "—")} •
@@ -193,7 +275,7 @@ doCheckBtn.onclick = async () => {
   show(reportsBlock);
 };
 
-// LIST VIEW / TABLE VIEW
+// -------- LIST PAGE --------
 let allEntries = [];
 
 async function loadAllEntries(){
@@ -202,7 +284,7 @@ async function loadAllEntries(){
 
   const { data, error } = await db
     .from("reports")
-    .select("reported_uid, reported_nickname, map, character, report_message, created_at")
+    .select("reported_uid, reported_nickname, map, character, reason, notes, created_at")
     .order("created_at", { ascending: false });
 
   if (error){
@@ -248,29 +330,29 @@ function renderEntries(){
 
   listCount.textContent = `${sorted.length} entries`;
 
-  // List cards
   listView.innerHTML = sorted.map(e=>{
     const date = new Date(e.created_at).toLocaleString();
     const name = e.reported_nickname || "Unknown";
     const uid  = e.reported_uid || "—";
-    const map  = e.map || "—";
-    const chr  = e.character || "—";
     return `
       <div class="entry-card">
         <div class="entry-top">
-          <div class="entry-name">${escapeHtml(name)} <span class="tag">UID: ${escapeHtml(uid)}</span></div>
+          <div class="entry-name">
+            ${escapeHtml(name)}
+            <span class="tag">UID: ${escapeHtml(uid)}</span>
+            <span class="tag">${escapeHtml(e.reason)}</span>
+          </div>
           <div class="entry-tags">
-            <span class="tag">Map: ${escapeHtml(map)}</span>
-            <span class="tag">Character: ${escapeHtml(chr)}</span>
+            <span class="tag">Map: ${escapeHtml(e.map || "—")}</span>
+            <span class="tag">Character: ${escapeHtml(e.character || "—")}</span>
           </div>
         </div>
-        <div class="entry-reason">${escapeHtml(e.report_message)}</div>
+        <div class="entry-reason">${escapeHtml(e.notes)}</div>
         <div class="entry-date">${date}</div>
       </div>
     `;
   }).join("");
 
-  // Table rows
   tableBody.innerHTML = sorted.map(e=>{
     const date = new Date(e.created_at).toLocaleString();
     const name = e.reported_nickname || "Unknown";
@@ -278,16 +360,15 @@ function renderEntries(){
     return `
       <tr>
         <td><strong>${escapeHtml(name)}</strong><br/><span class="muted">UID: ${escapeHtml(uid)}</span></td>
+        <td>${escapeHtml(e.reason)}</td>
         <td>${escapeHtml(e.map || "—")}</td>
         <td>${escapeHtml(e.character || "—")}</td>
-        <td>${escapeHtml(e.report_message)}</td>
+        <td>${escapeHtml(e.notes)}</td>
         <td>${date}</td>
       </tr>`;
   }).join("");
 }
 
 sortSelect.onchange = renderEntries;
-
-// toggle views
 listViewBtn.onclick = () => { show(listView); hide(tableView); };
 tableViewBtn.onclick = () => { hide(listView); show(tableView); };
