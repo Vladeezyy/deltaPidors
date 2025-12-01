@@ -33,6 +33,7 @@
       <div class="action-row">
         <button class="btn btn-ghost" id="checkBtn">Check user</button>
         <button class="btn btn-danger" id="reportBtn">Report user</button>
+        <button class="btn btn-primary" id="listBtn">List of pidars</button>
       </div>
     </section>
 
@@ -74,8 +75,19 @@
         <div class="hint">You must fill at least UID or nickname.</div>
       </div>
 
+      <div class="grid-2">
+        <div class="field">
+          <label for="reportMap">Map (required)</label>
+          <input id="reportMap" placeholder="e.g. Dust2, Mirage..." />
+        </div>
+        <div class="field">
+          <label for="reportChar">Character (optional)</label>
+          <input id="reportChar" placeholder="e.g. Sniper, Mage..." />
+        </div>
+      </div>
+
       <div class="field">
-        <label for="reportMessage">Report message</label>
+        <label for="reportMessage">Report reason (required)</label>
         <textarea id="reportMessage" rows="1" placeholder="Why are you reporting this user?"></textarea>
         <div class="hint">This box auto-expands as you type.</div>
       </div>
@@ -85,8 +97,61 @@
 
       <button class="btn btn-ghost" id="backFromReport">Back</button>
     </section>
+
+    <!-- LIST OF PIDARS -->
+    <section class="card hidden" id="listCard">
+      <div class="card-header">
+        <h2>List of pidars</h2>
+        <span class="pill" id="listCount">0 entries</span>
+      </div>
+
+      <div class="list-controls">
+        <div class="field">
+          <label for="sortSelect">Sort by</label>
+          <select id="sortSelect">
+            <option value="date_desc">Date ↓ (newest)</option>
+            <option value="date_asc">Date ↑ (oldest)</option>
+            <option value="name_asc">Name A→Z</option>
+            <option value="name_desc">Name Z→A</option>
+            <option value="map_asc">Map A→Z</option>
+            <option value="map_desc">Map Z→A</option>
+            <option value="char_asc">Character A→Z</option>
+            <option value="char_desc">Character Z→A</option>
+          </select>
+        </div>
+
+        <div class="view-toggle">
+          <button class="btn btn-ghost btn-small" id="listViewBtn">List</button>
+          <button class="btn btn-ghost btn-small" id="tableViewBtn">Table</button>
+        </div>
+      </div>
+
+      <div id="listView" class="entries-list"></div>
+
+      <div id="tableView" class="hidden">
+        <div class="table-wrap">
+          <table class="entries-table">
+            <thead>
+              <tr>
+                <th>Name / UID</th>
+                <th>Map</th>
+                <th>Character</th>
+                <th>Reason</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="msg" id="listMsg"></div>
+
+      <button class="btn btn-ghost" id="backFromList">Back</button>
+    </section>
+
   </div>
 
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js?v=5"></script>
 </body>
 </html>
