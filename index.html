@@ -1,63 +1,108 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>User Checker</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
-    h1 { margin-bottom: 8px; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 12px 0; }
-    input, textarea, button { width: 100%; padding: 10px; margin: 6px 0; font-size: 16px; }
-    button { cursor: pointer; }
-    .row { display:flex; gap:8px; }
-    .row > button { flex:1; }
-    .hidden { display:none; }
-    .ok { color: #0a7; }
-    .err { color: #c33; }
-  </style>
+
+  <!-- Modern font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <h1>User Checker</h1>
+  <div class="app">
+    <header class="topbar">
+      <div class="title">
+        <div class="logo"></div>
+        <div>
+          <h1>User Checker</h1>
+          <div class="subtitle">Register, check and report players</div>
+        </div>
+      </div>
+      <div class="status" id="currentUserBadge"></div>
+    </header>
 
-  <!-- Step 1: register -->
-  <div class="card" id="registerCard">
-    <h2>Register user</h2>
-    <input id="uidInput" placeholder="UID (required)"/>
-    <input id="nickInput" placeholder="Nickname (required)"/>
-    <button id="registerBtn">Save</button>
-    <div id="registerMsg"></div>
+    <!-- Register -->
+    <section class="card" id="registerCard">
+      <div class="card-header">
+        <h2>Register user</h2>
+        <span class="pill">required</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="uidInput">UID</label>
+          <input id="uidInput" placeholder="Enter UID" autocomplete="off"/>
+        </div>
+        <div class="field">
+          <label for="nickInput">Nickname</label>
+          <input id="nickInput" placeholder="Enter nickname" autocomplete="off"/>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="registerBtn">Save</button>
+      <div class="msg" id="registerMsg"></div>
+    </section>
+
+    <!-- Actions -->
+    <section class="card hidden" id="actionsCard">
+      <div class="card-header">
+        <h2>Actions</h2>
+        <span class="pill">choose one</span>
+      </div>
+
+      <div class="action-row">
+        <button class="btn btn-ghost" id="checkBtn">Check user</button>
+        <button class="btn btn-danger" id="reportBtn">Report user</button>
+      </div>
+    </section>
+
+    <!-- Check -->
+    <section class="card hidden" id="checkCard">
+      <div class="card-header">
+        <h2>Check user</h2>
+        <span class="pill">UID or nickname</span>
+      </div>
+
+      <div class="field">
+        <label for="checkQuery">Search</label>
+        <input id="checkQuery" placeholder="Enter UID or nickname"/>
+      </div>
+
+      <button class="btn btn-primary" id="doCheckBtn">Find</button>
+      <div class="msg" id="checkResult"></div>
+
+      <button class="btn btn-ghost" id="backFromCheck">Back</button>
+    </section>
+
+    <!-- Report -->
+    <section class="card hidden" id="reportCard">
+      <div class="card-header">
+        <h2>Report user</h2>
+        <span class="pill">required UID</span>
+      </div>
+
+      <div class="field">
+        <label for="reportedUid">Reported UID</label>
+        <input id="reportedUid" placeholder="UID of reported player"/>
+      </div>
+
+      <div class="field">
+        <label for="reason">Reason (optional)</label>
+        <textarea id="reason" rows="1" placeholder="Describe what happened..."></textarea>
+        <div class="hint">This box auto-expands as you type.</div>
+      </div>
+
+      <button class="btn btn-danger" id="doReportBtn">Submit report</button>
+      <div class="msg" id="reportMsg"></div>
+
+      <button class="btn btn-ghost" id="backFromReport">Back</button>
+    </section>
   </div>
 
-  <!-- Main actions -->
-  <div class="card hidden" id="actionsCard">
-    <h2>Actions</h2>
-    <div class="row">
-      <button id="checkBtn">Check user</button>
-      <button id="reportBtn">Report user</button>
-    </div>
-  </div>
-
-  <!-- Check form -->
-  <div class="card hidden" id="checkCard">
-    <h2>Check user</h2>
-    <input id="checkQuery" placeholder="Enter UID or nickname"/>
-    <button id="doCheckBtn">Find</button>
-    <div id="checkResult"></div>
-    <button id="backFromCheck">Back</button>
-  </div>
-
-  <!-- Report form -->
-  <div class="card hidden" id="reportCard">
-    <h2>Report user</h2>
-    <input id="reportedUid" placeholder="Reported user's UID (required)"/>
-    <textarea id="reason" placeholder="Reason (optional)"></textarea>
-    <button id="doReportBtn">Submit report</button>
-    <div id="reportMsg"></div>
-    <button id="backFromReport">Back</button>
-  </div>
-
-  <!-- Supabase JS -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>

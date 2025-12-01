@@ -31,70 +31,105 @@ const doReportBtn = document.getElementById("doReportBtn");
 const reportMsg = document.getElementById("reportMsg");
 const backFromReport = document.getElementById("backFromReport");
 
+const currentUserBadge = document.getElementById("currentUserBadge");
+
 // Helpers
 function show(el) { el.classList.remove("hidden"); }
 function hide(el) { el.classList.add("hidden"); }
-function msg(el, text, ok=true) {
-  el.className = ok ? "ok" : "err";
+function setMsg(el, text, ok=true) {
+  el.classList.remove("ok","err");
+  el.classList.add(ok ? "ok" : "err");
   el.textContent = text;
 }
+function setLoading(btn, isLoading, label="") {
+  btn.disabled = isLoading;
+  btn.innerHTML = isLoading
+    ? `<span class="spinner"></span>${label || btn.dataset.label || "Loading..."}`
+    : (btn.dataset.label || btn.textContent);
+}
 
-// Step 1: register user
+// Textarea auto-grow
+function autoGrowTextarea(t) {
+  t.style.height = "auto";
+  t.style.height = t.scrollHeight + "px";
+}
+reason.addEventListener("input", () => autoGrowTextarea(reason));
+window.addEventListener("load", () => autoGrowTextarea(reason));
+
+// Save current user badge
+function refreshBadge() {
+  const existingUid = localStorage.getItem("current_uid");
+  const existingNick = localStorage.getItem("current_nick");
+  currentUserBadge.textContent = existingUid
+    ? `You: ${existingNick} (${existingUid})`
+    : `Not registered`;
+}
+refreshBadge();
+
+// Register flow
+registerBtn.dataset.label = "Save";
 registerBtn.onclick = async () => {
   const uid = uidInput.value.trim();
   const nickname = nickInput.value.trim();
+
   if (!uid || !nickname) {
-    msg(registerMsg, "UID and nickname are required.", false);
+    setMsg(registerMsg, "UID and nickname are required.", false);
     return;
   }
+
+  setLoading(registerBtn, true, "Saving");
+  setMsg(registerMsg, "");
 
   const { error } = await db.from("users").insert([{ uid, nickname }]);
+
+  setLoading(registerBtn, false);
+
   if (error) {
-    msg(registerMsg, error.message, false);
+    setMsg(registerMsg, error.message, false);
     return;
   }
 
-  msg(registerMsg, "Saved! You can now check/report users.");
-  hide(registerCard);
-  show(actionsCard);
-
-  // store current user for report purposes
   localStorage.setItem("current_uid", uid);
   localStorage.setItem("current_nick", nickname);
+
+  setMsg(registerMsg, "Saved! You can now check/report users.");
+  hide(registerCard);
+  show(actionsCard);
+  refreshBadge();
 };
 
 // If already registered in this browser, skip register UI
-const existingUid = localStorage.getItem("current_uid");
-if (existingUid) {
+if (localStorage.getItem("current_uid")) {
   hide(registerCard);
   show(actionsCard);
 }
 
-// Actions navigation
+// Navigation
 checkBtn.onclick = () => { hide(actionsCard); show(checkCard); };
 reportBtn.onclick = () => { hide(actionsCard); show(reportCard); };
 
 backFromCheck.onclick = () => { hide(checkCard); show(actionsCard); };
 backFromReport.onclick = () => { hide(reportCard); show(actionsCard); };
 
-// Check user by UID or nickname
+// Check user
+doCheckBtn.dataset.label = "Find";
 doCheckBtn.onclick = async () => {
   const q = checkQuery.value.trim();
   if (!q) {
-    msg(checkResult, "Enter UID or nickname.", false);
+    setMsg(checkResult, "Enter UID or nickname.", false);
     return;
   }
 
-  // Try UID match first, then nickname
+  setLoading(doCheckBtn, true, "Searching");
+  setMsg(checkResult, "");
+
   let { data, error } = await db
     .from("users")
     .select("uid, nickname")
     .eq("uid", q)
     .limit(1);
 
-  if (error) return msg(checkResult, error.message, false);
-
-  if (!data || data.length === 0) {
+  if (!error && (!data || data.length === 0)) {
     ({ data, error } = await db
       .from("users")
       .select("uid, nickname")
@@ -102,34 +137,43 @@ doCheckBtn.onclick = async () => {
       .limit(1));
   }
 
-  if (error) return msg(checkResult, error.message, false);
+  setLoading(doCheckBtn, false);
+
+  if (error) return setMsg(checkResult, error.message, false);
 
   if (!data || data.length === 0) {
-    msg(checkResult, "Player not found.", false);
+    setMsg(checkResult, "Player not found.", false);
   } else {
     const u = data[0];
-    msg(checkResult, `Player found: nickname=${u.nickname}, UID=${u.uid}`);
+    setMsg(checkResult, `Player found: nickname=${u.nickname}, UID=${u.uid}`);
   }
 };
 
 // Report user
+doReportBtn.dataset.label = "Submit report";
 doReportBtn.onclick = async () => {
   const ruid = reportedUid.value.trim();
   if (!ruid) {
-    msg(reportMsg, "Reported UID is required.", false);
+    setMsg(reportMsg, "Reported UID is required.", false);
     return;
   }
+
+  setLoading(doReportBtn, true, "Submitting");
+  setMsg(reportMsg, "");
 
   const reporter_uid = localStorage.getItem("current_uid") || null;
   const { error } = await db
     .from("reports")
     .insert([{ reported_uid: ruid, reporter_uid, reason: reason.value.trim() }]);
 
+  setLoading(doReportBtn, false);
+
   if (error) {
-    msg(reportMsg, error.message, false);
+    setMsg(reportMsg, error.message, false);
   } else {
-    msg(reportMsg, "Report saved. Thanks!");
+    setMsg(reportMsg, "Report saved. Thanks!");
     reportedUid.value = "";
     reason.value = "";
+    autoGrowTextarea(reason);
   }
 };
