@@ -98,11 +98,13 @@ async function preprocessImage(file, soft = false){
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
 
-  canvas.width = img.width;
-  canvas.height = img.height;
+  // Upscale for nicknames to help CJK/emoji OCR
+  const scale = soft ? 2.5 : 1;
+  canvas.width = img.width * scale;
+  canvas.height = img.height * scale;
 
   // draw + grayscale + boost contrast
-  ctx.drawImage(img, 0, 0);
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   const { data } = ctx.getImageData(0,0,canvas.width, canvas.height);
 
   for (let i=0;i<data.length;i+=4){
@@ -190,7 +192,9 @@ async function runOcr(file, previewEl, boxEl, extractedEl, rawEl, kind){
               psm: 7 // single line text
             }
           : {
-              psm: 6 // block / mixed characters (Chinese, emojis, symbols)
+              psm: 6, // block / mixed characters (Chinese, emojis, symbols)
+              oem: 1, // LSTM engine only (better for CJK)
+              preserve_interword_spaces: 1
             })
       }
     );

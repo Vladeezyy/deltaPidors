@@ -213,7 +213,7 @@ textarea {
 .msg.ok { color: var(--ok); }
 .msg.err { color: var(--err); }
 
-.hidden { display:none; }
+.hidden { display: none !important; }
 
 .spinner {
   width:16px; height:16px;
@@ -417,17 +417,6 @@ pre {
   .action-row { grid-template-columns: 1fr; }
 }
 
-/* Better alignment for list controls */
-.list-controls {
-  display:flex;
-  align-items:flex-end;
-  justify-content:space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.list-controls .field {
-  min-width: 220px;
-}
 
 /* BANNED badge */
 .badge-banned {
